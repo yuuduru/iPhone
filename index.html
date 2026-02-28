@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Maps タイムライン可視化</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+    <div id="app">
+        <!-- Upload Screen -->
+        <div id="upload-screen">
+            <div class="upload-container">
+                <h1>Google Maps タイムライン可視化</h1>
+                <p class="description">
+                    Google Takeoutからエクスポートしたロケーション履歴データをアップロードして、
+                    訪れた場所を地図上に可視化します。
+                </p>
+                <div class="upload-instructions">
+                    <h3>データの取得方法</h3>
+                    <ol>
+                        <li><a href="https://takeout.google.com/" target="_blank" rel="noopener">Google Takeout</a> にアクセス</li>
+                        <li>「ロケーション履歴（タイムライン）」を選択してエクスポート</li>
+                        <li>ダウンロードしたZIPを解凍</li>
+                        <li>以下のいずれかのファイルをアップロード:
+                            <ul>
+                                <li><strong>Records.json</strong> — 全ロケーション記録</li>
+                                <li><strong>Semantic Location History</strong> フォルダ内の月別JSONファイル（複数選択可）</li>
+                            </ul>
+                        </li>
+                    </ol>
+                </div>
+                <div id="drop-zone" class="drop-zone">
+                    <div class="drop-zone-content">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        <p>ここにJSONファイルをドラッグ＆ドロップ</p>
+                        <p class="or">または</p>
+                        <button id="file-select-btn" class="btn btn-primary">ファイルを選択</button>
+                        <input type="file" id="file-input" multiple accept=".json" hidden />
+                    </div>
+                </div>
+                <div id="upload-progress" class="progress-container" hidden>
+                    <div class="progress-bar">
+                        <div id="progress-fill" class="progress-fill"></div>
+                    </div>
+                    <p id="progress-text">読み込み中...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Map Screen -->
+        <div id="map-screen" hidden>
+            <!-- Sidebar -->
+            <div id="sidebar" class="sidebar">
+                <div class="sidebar-header">
+                    <h2>タイムライン</h2>
+                    <button id="sidebar-toggle" class="sidebar-toggle" title="サイドバーを閉じる">&#x2715;</button>
+                </div>
+
+                <!-- Stats -->
+                <div class="stats-panel">
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-total-places">0</div>
+                        <div class="stat-label">訪問場所数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-total-visits">0</div>
+                        <div class="stat-label">総訪問回数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-date-range">-</div>
+                        <div class="stat-label">期間</div>
+                    </div>
+                </div>
+
+                <!-- Date Filter -->
+                <div class="filter-panel">
+                    <h3>期間フィルター</h3>
+                    <div class="date-inputs">
+                        <label>
+                            開始日
+                            <input type="date" id="filter-start" />
+                        </label>
+                        <label>
+                            終了日
+                            <input type="date" id="filter-end" />
+                        </label>
+                    </div>
+                    <button id="filter-apply" class="btn btn-primary btn-sm">適用</button>
+                    <button id="filter-reset" class="btn btn-secondary btn-sm">リセット</button>
+                </div>
+
+                <!-- View Mode -->
+                <div class="view-panel">
+                    <h3>表示モード</h3>
+                    <div class="view-modes">
+                        <button class="view-btn active" data-mode="markers">マーカー</button>
+                        <button class="view-btn" data-mode="heatmap">ヒートマップ</button>
+                        <button class="view-btn" data-mode="cluster">クラスター</button>
+                    </div>
+                </div>
+
+                <!-- Top Places -->
+                <div class="top-places-panel">
+                    <h3>よく訪れた場所 TOP 20</h3>
+                    <ul id="top-places-list" class="top-places-list"></ul>
+                </div>
+
+                <!-- Re-upload -->
+                <div class="reupload-panel">
+                    <button id="reupload-btn" class="btn btn-secondary">別のデータを読み込む</button>
+                </div>
+            </div>
+
+            <!-- Map -->
+            <div id="map"></div>
+
+            <!-- Mobile sidebar toggle -->
+            <button id="sidebar-open" class="sidebar-open-btn" title="サイドバーを開く">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="3" y1="12" x2="21" y2="12"/>
+                    <line x1="3" y1="6" x2="21" y2="6"/>
+                    <line x1="3" y1="18" x2="21" y2="18"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <script src="parser.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
