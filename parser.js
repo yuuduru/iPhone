@@ -81,6 +81,12 @@ const TimelineParser = (() => {
             return parseRecordsFormat(data);
         }
 
+        // location-history.json 形式 (新タイムラインエクスポート)
+        // 配列のルートに visit/activity オブジェクトが並ぶ形式
+        if (Array.isArray(data) && data.length > 0 && (data[0].visit || data[0].activity)) {
+            return parseNewTimelineFormat(data);
+        }
+
         console.warn('Unknown data format:', Object.keys(data));
         return [];
     }
@@ -186,6 +192,56 @@ const TimelineParser = (() => {
         }
 
         return visits;
+    }
+
+    /**
+     * 新タイムラインエクスポート形式をパース (location-history.json)
+     * ルート配列に visit/activity オブジェクトが並ぶ形式
+     * 座標は "geo:lat,lng" 文字列
+     */
+    function parseNewTimelineFormat(data) {
+        const visits = [];
+
+        for (const entry of data) {
+            if (entry.visit) {
+                const v = entry.visit;
+                const candidate = v.topCandidate;
+                if (!candidate || !candidate.placeLocation) continue;
+
+                const coords = parseGeoUri(candidate.placeLocation);
+                if (!coords) continue;
+
+                const startTs = parseTimestamp(entry.startTime);
+                const endTs = parseTimestamp(entry.endTime);
+
+                visits.push({
+                    lat: coords.lat,
+                    lng: coords.lng,
+                    timestamp: startTs || endTs || Date.now(),
+                    endTimestamp: endTs,
+                    name: null,
+                    address: null,
+                    placeId: candidate.placeID || null,
+                    semanticType: candidate.semanticType || null,
+                });
+            }
+        }
+
+        return visits;
+    }
+
+    /**
+     * "geo:lat,lng" 形式のURIをパース
+     */
+    function parseGeoUri(geoStr) {
+        if (!geoStr || !geoStr.startsWith('geo:')) return null;
+        const parts = geoStr.slice(4).split(',');
+        if (parts.length < 2) return null;
+        const lat = parseFloat(parts[0]);
+        const lng = parseFloat(parts[1]);
+        if (isNaN(lat) || isNaN(lng)) return null;
+        if (lat === 0 && lng === 0) return null;
+        return { lat, lng };
     }
 
     /**

@@ -42,6 +42,12 @@ a {
     overflow-y: auto;
 }
 
+/* hidden属性が明示的なdisplayスタイルで上書きされないようにする */
+#upload-screen[hidden],
+#map-screen[hidden] {
+    display: none;
+}
+
 .upload-container {
     max-width: 600px;
     width: 100%;
