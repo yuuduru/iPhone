@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>狛江市岩戸南 バス時刻表マップ</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="bus-styles.css" />
+</head>
+<body>
+    <!-- ヘッダー -->
+    <header class="header">
+        <h1>&#x1F68C; 岩戸南バス時刻表</h1>
+        <div class="header-time">
+            <span class="day-type-badge" id="day-type"></span>
+            <span class="clock" id="clock"></span>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <div class="main-container">
+        <!-- サイドパネル -->
+        <div class="side-panel" id="side-panel">
+            <!-- 次のバス -->
+            <div class="panel-section">
+                <h2>&#x23F1; 次に乗れるバス</h2>
+                <ul class="next-bus-list" id="next-bus-list">
+                    <!-- JSで動的生成 -->
+                </ul>
+                <div class="no-bus-message" id="no-bus-message" style="display:none;">
+                    <div class="icon">&#x1F319;</div>
+                    <div>本日の運行は終了しました</div>
+                </div>
+            </div>
+
+            <!-- 路線凡例 -->
+            <div class="panel-section">
+                <h2>&#x1F5FA; 路線</h2>
+                <ul class="route-legend" id="route-legend">
+                    <!-- JSで動的生成 -->
+                </ul>
+            </div>
+
+            <!-- 時刻表（クリック時に表示） -->
+            <div class="panel-section timetable-section" id="timetable-section">
+                <div class="timetable-header">
+                    <h3 id="timetable-title"></h3>
+                    <button class="timetable-close" id="timetable-close">&times;</button>
+                </div>
+                <div id="timetable-route-name" style="font-size:0.85rem;color:#666;margin-bottom:10px;"></div>
+                <div class="timetable-tabs" id="timetable-tabs">
+                    <button class="timetable-tab active" data-day="weekday">平日</button>
+                    <button class="timetable-tab" data-day="saturday">土曜</button>
+                    <button class="timetable-tab" data-day="holiday">日祝</button>
+                </div>
+                <div class="timetable-grid" id="timetable-grid">
+                    <!-- JSで動的生成 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 地図 -->
+        <div id="map"></div>
+    </div>
+
+    <!-- モバイルトグル -->
+    <button class="mobile-toggle" id="mobile-toggle">&#x1F4CB; 次のバスを見る</button>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="bus-data.js"></script>
+    <script src="bus.js"></script>
+</body>
+</html>

@@ -1,0 +1,463 @@
+/* バス停可視化サイト スタイルシート */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  background: #f5f5f5;
+  color: #333;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ヘッダー */
+.header {
+  background: linear-gradient(135deg, #1a237e, #283593);
+  color: white;
+  padding: 10px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.header h1 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-time {
+  font-size: 0.9rem;
+  opacity: 0.9;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.header-time .clock {
+  font-weight: 700;
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.day-type-badge {
+  background: rgba(255,255,255,0.2);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+}
+
+/* メインレイアウト */
+.main-container {
+  display: flex;
+  height: calc(100vh - 52px);
+}
+
+/* サイドパネル */
+.side-panel {
+  width: 340px;
+  background: white;
+  overflow-y: auto;
+  border-right: 1px solid #e0e0e0;
+  flex-shrink: 0;
+  z-index: 500;
+}
+
+.panel-section {
+  padding: 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.panel-section h2 {
+  font-size: 0.85rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 次のバスリスト */
+.next-bus-list {
+  list-style: none;
+}
+
+.next-bus-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: #fafafa;
+  border-radius: 10px;
+  border-left: 4px solid;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.next-bus-item:hover {
+  background: #f0f0f0;
+  transform: translateX(2px);
+}
+
+.next-bus-item.imminent {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { background: #fafafa; }
+  50% { background: #fff3e0; }
+}
+
+.bus-time-left {
+  font-size: 1.4rem;
+  font-weight: 700;
+  min-width: 60px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.bus-time-left .unit {
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: #888;
+}
+
+.bus-info {
+  flex: 1;
+  margin-left: 10px;
+}
+
+.bus-stop-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.bus-route-name {
+  font-size: 0.8rem;
+  color: #666;
+  margin-top: 2px;
+}
+
+.bus-direction {
+  font-size: 0.72rem;
+  color: #999;
+}
+
+.bus-depart-time {
+  font-size: 0.8rem;
+  color: #888;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* 路線凡例 */
+.route-legend {
+  list-style: none;
+}
+
+.route-legend li {
+  display: flex;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.route-legend li:hover {
+  opacity: 0.7;
+}
+
+.legend-color {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+.legend-name {
+  font-weight: 600;
+}
+
+.legend-desc {
+  font-size: 0.75rem;
+  color: #888;
+  margin-left: auto;
+}
+
+/* 時刻表セクション */
+.timetable-section {
+  display: none;
+}
+
+.timetable-section.active {
+  display: block;
+}
+
+.timetable-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.timetable-header h3 {
+  font-size: 1rem;
+}
+
+.timetable-close {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #666;
+  padding: 4px 8px;
+}
+
+.timetable-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.timetable-tab {
+  flex: 1;
+  padding: 6px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s;
+}
+
+.timetable-tab.active {
+  background: #1a237e;
+  color: white;
+  border-color: #1a237e;
+}
+
+.timetable-grid {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 2px;
+  font-size: 0.85rem;
+}
+
+.timetable-hour {
+  background: #f0f0f0;
+  padding: 4px 6px;
+  text-align: center;
+  font-weight: 700;
+  border-radius: 4px;
+}
+
+.timetable-minutes {
+  padding: 4px 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.timetable-minutes span {
+  font-variant-numeric: tabular-nums;
+}
+
+.timetable-minutes span.past {
+  color: #ccc;
+}
+
+.timetable-minutes span.next {
+  background: #ff6f00;
+  color: white;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-weight: 700;
+}
+
+/* 運行終了メッセージ */
+.no-bus-message {
+  text-align: center;
+  padding: 30px 20px;
+  color: #999;
+  font-size: 0.9rem;
+}
+
+.no-bus-message .icon {
+  font-size: 2rem;
+  margin-bottom: 8px;
+}
+
+/* 地図 */
+#map {
+  flex: 1;
+  z-index: 1;
+}
+
+/* Leafletポップアップ */
+.leaflet-popup-content-wrapper {
+  border-radius: 10px;
+}
+
+.leaflet-popup-content {
+  margin: 12px 16px;
+  font-family: inherit;
+}
+
+.popup-title {
+  font-weight: 700;
+  font-size: 1rem;
+  margin-bottom: 6px;
+}
+
+.popup-routes {
+  list-style: none;
+  margin-bottom: 8px;
+}
+
+.popup-routes li {
+  display: flex;
+  align-items: center;
+  padding: 3px 0;
+  font-size: 0.85rem;
+}
+
+.popup-route-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.popup-next {
+  background: #fff8e1;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  margin-top: 6px;
+}
+
+.popup-next strong {
+  color: #e65100;
+}
+
+.popup-btn {
+  display: block;
+  width: 100%;
+  padding: 8px;
+  margin-top: 8px;
+  background: #1a237e;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-align: center;
+}
+
+.popup-btn:hover {
+  background: #283593;
+}
+
+/* モバイル対応 */
+.mobile-toggle {
+  display: none;
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  background: #1a237e;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 25px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+@media (max-width: 768px) {
+  .header h1 {
+    font-size: 0.95rem;
+  }
+
+  .main-container {
+    flex-direction: column-reverse;
+  }
+
+  .side-panel {
+    width: 100%;
+    height: 45vh;
+    border-right: none;
+    border-top: 1px solid #e0e0e0;
+    overflow-y: auto;
+  }
+
+  .side-panel.collapsed {
+    height: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  #map {
+    height: 55vh;
+  }
+
+  .mobile-toggle {
+    display: block;
+  }
+
+  .side-panel.collapsed ~ .map-container .mobile-toggle {
+    display: block;
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    padding: 8px 12px;
+  }
+
+  .header h1 {
+    font-size: 0.85rem;
+  }
+
+  .panel-section {
+    padding: 12px;
+  }
+
+  .bus-time-left {
+    font-size: 1.2rem;
+    min-width: 50px;
+  }
+}
+
+/* スクロールバー */
+.side-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.side-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.side-panel::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 3px;
+}
+
+.side-panel::-webkit-scrollbar-thumb:hover {
+  background: #aaa;
+}
