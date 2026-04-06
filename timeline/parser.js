@@ -4,6 +4,7 @@
  * - Records.json (新フォーマット)
  * - Semantic Location History (月別JSON)
  * - Location History.json (旧フォーマット)
+ * - location-history.json (新タイムラインエクスポート)
  */
 
 const TimelineParser = (() => {
@@ -11,10 +12,12 @@ const TimelineParser = (() => {
      * 複数ファイルを解析して統合した訪問データを返す
      * @param {File[]} files
      * @param {function} onProgress - 進捗コールバック (0-100)
-     * @returns {Promise<{places: Map, visits: Array, dateRange: {min: Date, max: Date}}>}
+     * @returns {Promise<{places: Map, visits: Array, activities: Array, timelinePaths: Array, dateRange: Object}>}
      */
     async function parseFiles(files, onProgress) {
         const allVisits = [];
+        const allActivities = [];
+        const allTimelinePaths = [];
         const totalFiles = files.length;
 
         for (let i = 0; i < files.length; i++) {
@@ -28,14 +31,18 @@ const TimelineParser = (() => {
                 continue;
             }
 
-            const visits = extractVisits(data);
-            allVisits.push(...visits);
+            const result = extractData(data);
+            allVisits.push(...result.visits);
+            allActivities.push(...result.activities);
+            allTimelinePaths.push(...result.timelinePaths);
         }
 
         onProgress(85);
 
-        // 訪問データを日時順にソート
+        // 日時順にソート
         allVisits.sort((a, b) => a.timestamp - b.timestamp);
+        allActivities.sort((a, b) => a.startTime - b.startTime);
+        allTimelinePaths.sort((a, b) => a.startTime - b.startTime);
 
         // 場所ごとに集計
         const places = aggregatePlaces(allVisits);
@@ -50,7 +57,7 @@ const TimelineParser = (() => {
 
         onProgress(100);
 
-        return { places, visits: allVisits, dateRange };
+        return { places, visits: allVisits, activities: allActivities, timelinePaths: allTimelinePaths, dateRange };
     }
 
     function readFile(file) {
@@ -63,32 +70,28 @@ const TimelineParser = (() => {
     }
 
     /**
-     * JSONデータからフォーマットを自動判定して訪問データを抽出
+     * JSONデータからフォーマットを自動判定してデータを抽出
+     * @returns {{ visits: Array, activities: Array, timelinePaths: Array }}
      */
-    function extractVisits(data) {
+    function extractData(data) {
         // Records.json 形式 (新フォーマット)
         if (data.locations && Array.isArray(data.locations)) {
-            return parseRecordsFormat(data);
+            return { visits: parseRecordsFormat(data), activities: [], timelinePaths: [] };
         }
 
         // Semantic Location History 形式
         if (data.timelineObjects && Array.isArray(data.timelineObjects)) {
-            return parseSemanticFormat(data);
-        }
-
-        // 旧フォーマット (Location History.json)
-        if (data.locations && Array.isArray(data.locations) && data.locations[0]?.latitudeE7) {
-            return parseRecordsFormat(data);
+            return { visits: parseSemanticFormat(data), activities: [], timelinePaths: [] };
         }
 
         // location-history.json 形式 (新タイムラインエクスポート)
-        // 配列のルートに visit/activity オブジェクトが並ぶ形式
-        if (Array.isArray(data) && data.length > 0 && (data[0].visit || data[0].activity)) {
+        // 配列のルートに visit/activity/timelinePath オブジェクトが並ぶ形式
+        if (Array.isArray(data) && data.length > 0 && (data[0].visit || data[0].activity || data[0].timelinePath)) {
             return parseNewTimelineFormat(data);
         }
 
         console.warn('Unknown data format:', Object.keys(data));
-        return [];
+        return { visits: [], activities: [], timelinePaths: [] };
     }
 
     /**
@@ -196,11 +199,14 @@ const TimelineParser = (() => {
 
     /**
      * 新タイムラインエクスポート形式をパース (location-history.json)
-     * ルート配列に visit/activity オブジェクトが並ぶ形式
+     * ルート配列に visit/activity/timelinePath オブジェクトが並ぶ形式
      * 座標は "geo:lat,lng" 文字列
+     * @returns {{ visits: Array, activities: Array, timelinePaths: Array }}
      */
     function parseNewTimelineFormat(data) {
         const visits = [];
+        const activities = [];
+        const timelinePaths = [];
 
         for (const entry of data) {
             if (entry.visit) {
@@ -224,10 +230,50 @@ const TimelineParser = (() => {
                     placeId: candidate.placeID || null,
                     semanticType: candidate.semanticType || null,
                 });
+            } else if (entry.activity) {
+                const a = entry.activity;
+                const startCoords = parseGeoUri(a.start);
+                const endCoords = parseGeoUri(a.end);
+                if (!startCoords || !endCoords) continue;
+
+                const startTs = parseTimestamp(entry.startTime);
+                const endTs = parseTimestamp(entry.endTime);
+                if (!startTs) continue;
+
+                activities.push({
+                    startTime: startTs,
+                    endTime: endTs,
+                    startLat: startCoords.lat,
+                    startLng: startCoords.lng,
+                    endLat: endCoords.lat,
+                    endLng: endCoords.lng,
+                    distanceMeters: parseFloat(a.distanceMeters) || 0,
+                    transportType: a.topCandidate?.type || 'unknown',
+                    probability: parseFloat(a.topCandidate?.probability) || 0,
+                });
+            } else if (entry.timelinePath) {
+                const startTs = parseTimestamp(entry.startTime);
+                const endTs = parseTimestamp(entry.endTime);
+                if (!startTs || !entry.timelinePath.length) continue;
+
+                const points = [];
+                for (const pt of entry.timelinePath) {
+                    const coords = parseGeoUri(pt.point);
+                    if (!coords) continue;
+                    const offsetMs = (parseFloat(pt.durationMinutesOffsetFromStartTime) || 0) * 60000;
+                    points.push({
+                        lat: coords.lat,
+                        lng: coords.lng,
+                        timestamp: startTs + offsetMs,
+                    });
+                }
+                if (points.length > 0) {
+                    timelinePaths.push({ startTime: startTs, endTime: endTs, points });
+                }
             }
         }
 
-        return visits;
+        return { visits, activities, timelinePaths };
     }
 
     /**

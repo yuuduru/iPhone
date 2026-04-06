@@ -6,15 +6,24 @@
     let map = null;
     let allPlaces = new Map();
     let allVisits = [];
+    let allActivities = [];
+    let allTimelinePaths = [];
     let filteredPlaces = new Map();
     let filteredVisits = [];
     let dateRange = { min: null, max: null };
     let currentMode = 'markers';
 
+    // Route state
+    let dailyTimeline = new Map(); // "YYYY-MM-DD" → DayData
+    let selectedDate = null;
+    let sortedDates = [];           // dailyTimelineのキーをソート済みで保持
+
     // Layers
     let markerLayer = null;
     let heatLayer = null;
     let clusterLayer = null;
+    let routeLayer = null;
+    let routeMarkerLayer = null;
 
     // DOM elements
     const uploadScreen = document.getElementById('upload-screen');
@@ -40,6 +49,7 @@
         setupSidebar();
         setupFilters();
         setupViewModes();
+        setupRouteNavigation();
         setupReupload();
     }
 
@@ -86,6 +96,8 @@
 
             allPlaces = result.places;
             allVisits = result.visits;
+            allActivities = result.activities || [];
+            allTimelinePaths = result.timelinePaths || [];
             dateRange = result.dateRange;
 
             if (allVisits.length === 0) {
@@ -93,6 +105,10 @@
                 progressFill.style.width = '0%';
                 return;
             }
+
+            // 日次タイムラインインデックスを構築
+            dailyTimeline = buildDailyTimeline(allVisits, allActivities, allTimelinePaths);
+            sortedDates = Array.from(dailyTimeline.keys()).sort();
 
             progressText.textContent = `${allVisits.length.toLocaleString()}件のデータを読み込みました`;
 
@@ -111,6 +127,46 @@
         }
     }
 
+    // --- Daily Timeline Index ---
+    function buildDailyTimeline(visits, activities, timelinePaths) {
+        const timeline = new Map();
+
+        function getOrCreateDay(dateStr) {
+            if (!timeline.has(dateStr)) {
+                timeline.set(dateStr, {
+                    date: dateStr,
+                    visits: [],
+                    activities: [],
+                    timelinePaths: [],
+                    totalDistanceMeters: 0,
+                    transportBreakdown: new Map(),
+                });
+            }
+            return timeline.get(dateStr);
+        }
+
+        for (const v of visits) {
+            const dateStr = toISODate(new Date(v.timestamp));
+            getOrCreateDay(dateStr).visits.push(v);
+        }
+
+        for (const a of activities) {
+            const dateStr = toISODate(new Date(a.startTime));
+            const day = getOrCreateDay(dateStr);
+            day.activities.push(a);
+            day.totalDistanceMeters += a.distanceMeters;
+            const existing = day.transportBreakdown.get(a.transportType) || 0;
+            day.transportBreakdown.set(a.transportType, existing + a.distanceMeters);
+        }
+
+        for (const tp of timelinePaths) {
+            const dateStr = toISODate(new Date(tp.startTime));
+            getOrCreateDay(dateStr).timelinePaths.push(tp);
+        }
+
+        return timeline;
+    }
+
     // --- Map Screen ---
     function showMapScreen() {
         uploadScreen.hidden = true;
@@ -118,6 +174,16 @@
 
         if (!map) {
             initMap();
+        }
+
+        // ルートボタンの有効/無効
+        const routeBtn = document.getElementById('route-mode-btn');
+        if (allActivities.length === 0) {
+            routeBtn.disabled = true;
+            routeBtn.title = 'ルートデータがありません';
+        } else {
+            routeBtn.disabled = false;
+            routeBtn.title = '';
         }
 
         updateStats();
@@ -143,6 +209,8 @@
             spiderfyOnMaxZoom: true,
             showCoverageOnHover: false,
         });
+        routeLayer = L.layerGroup();
+        routeMarkerLayer = L.layerGroup();
     }
 
     function renderMap() {
@@ -158,6 +226,9 @@
             case 'cluster':
                 renderClusters();
                 break;
+            case 'route':
+                renderRoute();
+                return; // renderRouteが独自にfitBoundsする
         }
 
         fitBounds();
@@ -172,6 +243,14 @@
         if (clusterLayer) {
             map.removeLayer(clusterLayer);
             clusterLayer.clearLayers();
+        }
+        if (routeLayer) {
+            map.removeLayer(routeLayer);
+            routeLayer.clearLayers();
+        }
+        if (routeMarkerLayer) {
+            map.removeLayer(routeMarkerLayer);
+            routeMarkerLayer.clearLayers();
         }
     }
 
@@ -231,6 +310,247 @@
         }
 
         map.addLayer(clusterLayer);
+    }
+
+    // --- Route Rendering ---
+    function renderRoute() {
+        if (!selectedDate) {
+            // 自動で直近日を選択
+            if (sortedDates.length > 0) {
+                selectedDate = sortedDates[sortedDates.length - 1];
+                document.getElementById('route-date-input').value = selectedDate;
+            } else {
+                return;
+            }
+        }
+
+        const dayData = dailyTimeline.get(selectedDate);
+        if (!dayData) {
+            updateRouteSummaryEmpty();
+            return;
+        }
+
+        routeLayer.clearLayers();
+        routeMarkerLayer.clearLayers();
+
+        const allPoints = [];
+
+        // 移動区間のポリラインを描画
+        for (const activity of dayData.activities) {
+            const polylinePoints = getRoutePoints(activity, dayData.timelinePaths);
+            const color = getTransportColor(activity.transportType);
+
+            const polyline = L.polyline(polylinePoints, {
+                color: color,
+                weight: 4,
+                opacity: 0.8,
+                dashArray: getDashArray(activity.transportType),
+            });
+
+            polyline.bindPopup(`<div class="route-popup">
+                <h4>${getTransportLabel(activity.transportType)}</h4>
+                <p>${formatTime(activity.startTime)} - ${formatTime(activity.endTime)}</p>
+                <p>${formatDistance(activity.distanceMeters)}</p>
+            </div>`);
+
+            routeLayer.addLayer(polyline);
+
+            allPoints.push([activity.startLat, activity.startLng]);
+            allPoints.push([activity.endLat, activity.endLng]);
+        }
+
+        // 訪問地点のマーカーを描画
+        dayData.visits.forEach((visit, index) => {
+            const marker = L.marker([visit.lat, visit.lng], {
+                icon: createNumberedIcon(index + 1),
+                zIndexOffset: 1000,
+            });
+
+            const durationStr = visit.endTimestamp
+                ? `<p class="route-duration">滞在: ${formatDuration(visit.endTimestamp - visit.timestamp)}</p>`
+                : '';
+
+            marker.bindPopup(`<div class="route-popup">
+                <h4>${escapeHtml(visit.name || '訪問地点 #' + (index + 1))}</h4>
+                <p>到着: ${formatTime(visit.timestamp)}</p>
+                ${visit.endTimestamp ? `<p>出発: ${formatTime(visit.endTimestamp)}</p>` : ''}
+                ${durationStr}
+            </div>`);
+
+            routeMarkerLayer.addLayer(marker);
+            allPoints.push([visit.lat, visit.lng]);
+        });
+
+        map.addLayer(routeLayer);
+        map.addLayer(routeMarkerLayer);
+
+        // 表示範囲を調整
+        if (allPoints.length > 0) {
+            map.fitBounds(L.latLngBounds(allPoints), { padding: [50, 50], maxZoom: 15 });
+        }
+
+        updateRouteSummary(dayData);
+    }
+
+    /**
+     * activityの時間帯に合致するtimelinePathのGPS点を取得
+     * なければstart→endの直線を返す
+     */
+    function getRoutePoints(activity, timelinePaths) {
+        const matchingPoints = [];
+
+        for (const tp of timelinePaths) {
+            // 時間帯の重複チェック
+            if (tp.endTime < activity.startTime || tp.startTime > activity.endTime) continue;
+
+            for (const pt of tp.points) {
+                if (pt.timestamp >= activity.startTime && pt.timestamp <= activity.endTime) {
+                    matchingPoints.push({ lat: pt.lat, lng: pt.lng, timestamp: pt.timestamp });
+                }
+            }
+        }
+
+        if (matchingPoints.length >= 2) {
+            matchingPoints.sort((a, b) => a.timestamp - b.timestamp);
+            return matchingPoints.map(p => [p.lat, p.lng]);
+        }
+
+        // フォールバック: start→end の直線
+        return [
+            [activity.startLat, activity.startLng],
+            [activity.endLat, activity.endLng],
+        ];
+    }
+
+    // --- Transport Styling ---
+    function getTransportColor(type) {
+        const colors = {
+            'in passenger vehicle': '#4285f4',
+            'walking': '#34a853',
+            'in train': '#ea4335',
+            'in bus': '#fbbc04',
+            'cycling': '#ff6d01',
+            'in subway': '#9c27b0',
+            'flying': '#00bcd4',
+            'in tram': '#795548',
+            'in ferry': '#607d8b',
+            'running': '#e91e63',
+        };
+        return colors[type] || '#9e9e9e';
+    }
+
+    function getDashArray(type) {
+        if (type === 'walking' || type === 'running') return '6, 8';
+        if (type === 'cycling') return '10, 5';
+        return null;
+    }
+
+    function getTransportLabel(type) {
+        const labels = {
+            'in passenger vehicle': '車',
+            'walking': '徒歩',
+            'in train': '電車',
+            'in bus': 'バス',
+            'cycling': '自転車',
+            'in subway': '地下鉄',
+            'flying': '飛行機',
+            'in tram': '路面電車',
+            'in ferry': 'フェリー',
+            'running': 'ランニング',
+        };
+        return labels[type] || type;
+    }
+
+    function createNumberedIcon(number) {
+        return L.divIcon({
+            className: 'route-marker-icon',
+            html: `<div class="route-marker-number">${number}</div>`,
+            iconSize: [28, 28],
+            iconAnchor: [14, 14],
+            popupAnchor: [0, -14],
+        });
+    }
+
+    // --- Route Summary ---
+    function updateRouteSummary(dayData) {
+        const container = document.getElementById('route-summary');
+        const visitCount = dayData.visits.length;
+        const totalKm = (dayData.totalDistanceMeters / 1000).toFixed(1);
+        const activityCount = dayData.activities.length;
+
+        let breakdownHtml = '';
+        for (const [type, meters] of dayData.transportBreakdown) {
+            const km = (meters / 1000).toFixed(1);
+            const color = getTransportColor(type);
+            const label = getTransportLabel(type);
+            breakdownHtml += `
+                <div class="transport-item">
+                    <span class="transport-color" style="background:${color}"></span>
+                    <span class="transport-label">${label}</span>
+                    <span class="transport-distance">${km} km</span>
+                </div>
+            `;
+        }
+
+        container.innerHTML = `
+            <div class="route-stats">
+                <div class="route-stat">
+                    <span class="route-stat-value">${visitCount}</span>
+                    <span class="route-stat-label">訪問</span>
+                </div>
+                <div class="route-stat">
+                    <span class="route-stat-value">${totalKm}</span>
+                    <span class="route-stat-label">km</span>
+                </div>
+                <div class="route-stat">
+                    <span class="route-stat-value">${activityCount}</span>
+                    <span class="route-stat-label">移動</span>
+                </div>
+            </div>
+            ${breakdownHtml ? `<div class="transport-breakdown">${breakdownHtml}</div>` : ''}
+        `;
+    }
+
+    function updateRouteSummaryEmpty() {
+        const container = document.getElementById('route-summary');
+        container.innerHTML = '<p style="color:var(--text-light);font-size:13px;">この日のデータはありません</p>';
+    }
+
+    // --- Route Date Navigation ---
+    function setupRouteNavigation() {
+        const dateInput = document.getElementById('route-date-input');
+        const prevBtn = document.getElementById('route-prev');
+        const nextBtn = document.getElementById('route-next');
+
+        dateInput.addEventListener('change', () => {
+            selectedDate = dateInput.value;
+            if (currentMode === 'route') renderMap();
+        });
+
+        prevBtn.addEventListener('click', () => navigateDate(-1));
+        nextBtn.addEventListener('click', () => navigateDate(1));
+    }
+
+    function navigateDate(direction) {
+        if (sortedDates.length === 0) return;
+
+        if (!selectedDate) {
+            selectedDate = sortedDates[sortedDates.length - 1];
+        } else {
+            const currentIndex = sortedDates.indexOf(selectedDate);
+            if (currentIndex === -1) {
+                // 現在の日付がデータにない場合、最も近い日を探す
+                selectedDate = sortedDates[sortedDates.length - 1];
+            } else {
+                const newIndex = currentIndex + direction;
+                if (newIndex >= 0 && newIndex < sortedDates.length) {
+                    selectedDate = sortedDates[newIndex];
+                }
+            }
+        }
+
+        document.getElementById('route-date-input').value = selectedDate;
+        if (currentMode === 'route') renderMap();
     }
 
     function fitBounds() {
@@ -392,11 +712,27 @@
     // --- View Modes ---
     function setupViewModes() {
         const buttons = document.querySelectorAll('.view-btn');
+        const routePanel = document.getElementById('route-panel');
+
         buttons.forEach(btn => {
             btn.addEventListener('click', () => {
+                if (btn.disabled) return;
+
                 buttons.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 currentMode = btn.dataset.mode;
+
+                // ルートパネルの表示/非表示
+                if (currentMode === 'route') {
+                    routePanel.hidden = false;
+                    if (!selectedDate && sortedDates.length > 0) {
+                        selectedDate = sortedDates[sortedDates.length - 1];
+                        document.getElementById('route-date-input').value = selectedDate;
+                    }
+                } else {
+                    routePanel.hidden = true;
+                }
+
                 renderMap();
             });
         });
@@ -424,8 +760,21 @@
             clearLayers();
             allPlaces = new Map();
             allVisits = [];
+            allActivities = [];
+            allTimelinePaths = [];
             filteredPlaces = new Map();
             filteredVisits = [];
+            dailyTimeline = new Map();
+            selectedDate = null;
+            sortedDates = [];
+
+            // ルートパネルを閉じてマーカーモードに戻す
+            document.getElementById('route-panel').hidden = true;
+            const buttons = document.querySelectorAll('.view-btn');
+            buttons.forEach(b => b.classList.remove('active'));
+            const markersBtn = document.querySelector('.view-btn[data-mode="markers"]');
+            if (markersBtn) markersBtn.classList.add('active');
+            currentMode = 'markers';
         });
     }
 
@@ -439,6 +788,24 @@
     function toISODate(date) {
         const d = date instanceof Date ? date : new Date(date);
         return d.toISOString().split('T')[0];
+    }
+
+    function formatTime(timestamp) {
+        const d = new Date(timestamp);
+        return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+
+    function formatDuration(ms) {
+        const totalMinutes = Math.round(ms / 60000);
+        if (totalMinutes < 60) return `${totalMinutes}分`;
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        return minutes > 0 ? `${hours}時間${minutes}分` : `${hours}時間`;
+    }
+
+    function formatDistance(meters) {
+        if (meters < 1000) return `${Math.round(meters)} m`;
+        return `${(meters / 1000).toFixed(1)} km`;
     }
 
     function escapeHtml(str) {

@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>長谷川あかり レシピ集</title>
+    <style>
+        :root {
+            --primary: #e8725a;
+            --primary-dark: #d4604a;
+            --secondary: #5f6368;
+            --bg: #ffffff;
+            --bg-light: #f8f9fa;
+            --bg-warm: #fef7f4;
+            --border: #e8e0dc;
+            --text: #2d2420;
+            --text-light: #7a6e68;
+            --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+            --shadow-lg: 0 4px 12px rgba(0,0,0,0.12);
+            --radius: 12px;
+            --cat-meat: #e8725a;
+            --cat-side: #66bb6a;
+            --cat-soup: #42a5f5;
+            --cat-rice: #ffa726;
+            --cat-curry: #ab47bc;
+            --cat-tofu: #78909c;
+            --cat-stew: #8d6e63;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+            background: var(--bg-light);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .header {
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            padding: 24px 20px 16px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text);
+            letter-spacing: 0.02em;
+        }
+        .header p {
+            font-size: 0.85rem;
+            color: var(--text-light);
+            margin-top: 4px;
+        }
+
+        .filter-bar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 20px;
+        }
+        .search-wrap {
+            max-width: 480px;
+            margin: 0 auto 10px;
+            position: relative;
+        }
+        .search-wrap svg {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-light);
+        }
+        .search-input {
+            width: 100%;
+            padding: 10px 14px 10px 38px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            outline: none;
+            background: var(--bg-light);
+            transition: border-color 0.2s;
+        }
+        .search-input:focus { border-color: var(--primary); }
+
+        .category-btns {
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+            flex-wrap: wrap;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        .cat-btn {
+            padding: 5px 14px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            background: var(--bg);
+            font-size: 0.78rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-light);
+            white-space: nowrap;
+        }
+        .cat-btn:hover { border-color: var(--primary); color: var(--primary); }
+        .cat-btn.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+
+        .recipe-count {
+            text-align: center;
+            font-size: 0.8rem;
+            color: var(--text-light);
+            padding: 12px 20px 0;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+            padding: 16px 20px 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: var(--bg);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            cursor: pointer;
+            transition: box-shadow 0.2s, transform 0.2s;
+        }
+        .card:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+        }
+        .card-accent { height: 4px; }
+        .card-body { padding: 16px; }
+        .card-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+        .card-meta {
+            display: flex;
+            gap: 12px;
+            font-size: 0.78rem;
+            color: var(--text-light);
+            margin-bottom: 8px;
+        }
+        .card-meta span { display: flex; align-items: center; gap: 3px; }
+        .card-tag {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: #fff;
+            margin-bottom: 10px;
+        }
+        .card-ingredients {
+            font-size: 0.78rem;
+            color: var(--text-light);
+            line-height: 1.5;
+        }
+
+        .empty {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-light);
+            font-size: 0.95rem;
+            grid-column: 1 / -1;
+        }
+
+        .overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            z-index: 200;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 40px 16px;
+            overflow-y: auto;
+        }
+        .overlay.show { display: flex; }
+
+        .modal {
+            background: var(--bg);
+            border-radius: var(--radius);
+            max-width: 600px;
+            width: 100%;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            animation: slideUp 0.25s ease;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .modal-accent { height: 5px; border-radius: var(--radius) var(--radius) 0 0; }
+        .modal-close {
+            position: absolute;
+            right: 12px;
+            top: 12px;
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: var(--bg-light);
+            border-radius: 50%;
+            font-size: 1.1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-light);
+            transition: background 0.2s;
+            z-index: 1;
+        }
+        .modal-close:hover { background: var(--border); }
+
+        .modal-body { padding: 24px; }
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            padding-right: 40px;
+        }
+        .modal-meta {
+            display: flex;
+            gap: 16px;
+            font-size: 0.85rem;
+            color: var(--text-light);
+            margin-bottom: 16px;
+        }
+        .modal-meta span { display: flex; align-items: center; gap: 4px; }
+        .modal-tag {
+            display: inline-block;
+            padding: 3px 12px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #fff;
+            margin-bottom: 20px;
+        }
+
+        .section-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 8px;
+            padding-bottom: 4px;
+            border-bottom: 2px solid var(--primary);
+            display: inline-block;
+        }
+
+        .ing-list { margin-bottom: 24px; }
+        .ing-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 7px 8px;
+            font-size: 0.88rem;
+            border-radius: 4px;
+        }
+        .ing-row:nth-child(even) { background: var(--bg-warm); }
+        .ing-name { color: var(--text); }
+        .ing-amount { color: var(--text-light); white-space: nowrap; margin-left: 12px; }
+
+        .steps-list { list-style: none; counter-reset: step; }
+        .steps-list li {
+            counter-increment: step;
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+            font-size: 0.88rem;
+            line-height: 1.6;
+        }
+        .steps-list li::before {
+            content: counter(step);
+            flex-shrink: 0;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: #fff;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 1px;
+        }
+
+        @media (max-width: 768px) {
+            .grid { grid-template-columns: 1fr; padding: 12px 12px 32px; gap: 12px; }
+            .header { padding: 18px 16px 12px; }
+            .header h1 { font-size: 1.3rem; }
+            .filter-bar { padding: 10px 12px; }
+            .overlay { padding: 20px 8px; }
+            .modal-body { padding: 20px 16px; }
+        }
+        @media (max-width: 480px) {
+            .category-btns { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+            .category-btns::-webkit-scrollbar { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>長谷川あかり レシピ集</h1>
+        <p>Xでバズった人気レシピをレピッタ風にまとめました</p>
+    </div>
+    <div class="filter-bar">
+        <div class="search-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" class="search-input" id="search" placeholder="レシピ名・材料で検索...">
+        </div>
+        <div class="category-btns" id="categoryBtns"></div>
+    </div>
+    <div class="recipe-count" id="recipeCount"></div>
+    <div class="grid" id="grid"></div>
+    <div class="overlay" id="overlay">
+        <div class="modal" id="modal"></div>
+    </div>
+
+    <script>
+    (function() {
+        const CATEGORIES = ['すべて','肉料理','副菜','スープ・汁物','麺・ご飯','カレー','豆腐料理','煮込み'];
+        const CAT_COLORS = {
+            '肉料理': 'var(--cat-meat)',
+            '副菜': 'var(--cat-side)',
+            'スープ・汁物': 'var(--cat-soup)',
+            '麺・ご飯': 'var(--cat-rice)',
+            'カレー': 'var(--cat-curry)',
+            '豆腐料理': 'var(--cat-tofu)',
+            '煮込み': 'var(--cat-stew)',
+        };
+
+        const RECIPES = [
+            {
+                id:1, title:'酒蒸しハンバーグ', servings:'2人分', time:'15分', category:'肉料理',
+                ingredients:[
+                    {name:'ベーコン',amount:'1/2枚'},{name:'合いびき肉',amount:'220g'},
+                    {name:'牛乳',amount:'100ml'},{name:'片栗粉',amount:'小さじ1'},
+                    {name:'塩',amount:'小さじ1/2'},{name:'砂糖',amount:'小さじ1/2'},
+                    {name:'にんにくすりおろし',amount:'小さじ1/4'},{name:'ナツメグ',amount:'6ふり'},
+                    {name:'バター',amount:'10g'},{name:'料理酒',amount:'50ml'},
+                    {name:'ミニトマト',amount:'14〜20個'}
+                ],
+                steps:[
+                    'ベーコンを細かく刻んでフライパンに入れ、ひき肉・牛乳・片栗粉・塩・砂糖・にんにく・ナツメグを加え、ゴムベラでしっかり練る。2等分して楕円形に成形する。',
+                    'フライパンをキッチンペーパーでさっと拭き、バターを入れ中火で3分焼き、裏返す。',
+                    '料理酒を加えフタをして弱めの中火で5分。ミニトマトを加えてさらに5分蒸し焼きにする。'
+                ]
+            },
+            {
+                id:2, title:'しょうゆだけ唐揚げ', servings:'2人分', time:'15分', category:'肉料理',
+                ingredients:[
+                    {name:'鶏もも肉',amount:'1枚(300g)'},{name:'しょうゆ',amount:'大さじ2'},
+                    {name:'小麦粉',amount:'大さじ1.5'},{name:'片栗粉',amount:'大さじ6'},
+                    {name:'サラダ油',amount:'大さじ3'}
+                ],
+                steps:[
+                    '鶏肉を一口大に切り、ポリ袋に入れてしょうゆをもみ込む。',
+                    '小麦粉を加えてもみ込み、片栗粉をたっぷりまぶす。',
+                    'フライパンに油を入れ、火をつける前に鶏肉を並べる。弱めの中火で4分→裏返して4分→強火にして両面30秒ずつ。'
+                ]
+            },
+            {
+                id:3, title:'ちくわとじゃがいものバター煮', servings:'2人分', time:'20分', category:'副菜',
+                ingredients:[
+                    {name:'じゃがいも',amount:'2個'},{name:'ちくわ',amount:'2本'},
+                    {name:'料理酒',amount:'大さじ2'},{name:'バター',amount:'10g'},
+                    {name:'塩',amount:'小さじ1/3'},{name:'水',amount:'ひたひた'},
+                    {name:'小ネギ',amount:'適量'}
+                ],
+                steps:[
+                    'じゃがいもとちくわを一口大に切る。',
+                    '鍋にすべての材料と調味料、ひたひたの水を入れ中火にかける。煮立ったら弱めの中火で15分煮る。',
+                    '水気がなくなってきたら火を強め、煮崩れたじゃがいもをちくわに絡める。塩で味を調え、小ネギを散らす。'
+                ]
+            },
+            {
+                id:4, title:'フライパンで目玉焼きみそ汁', servings:'2人分', time:'10分', category:'スープ・汁物',
+                ingredients:[
+                    {name:'卵',amount:'2個'},{name:'長ねぎ（白い部分）',amount:'1本分'},
+                    {name:'削り節',amount:'3g'},{name:'みそ',amount:'大さじ2'},
+                    {name:'サラダ油',amount:'小さじ1.5'},{name:'水',amount:'2カップ'}
+                ],
+                steps:[
+                    'フライパンにサラダ油を熱し、斜め薄切りにした長ねぎを炒める。',
+                    'ねぎを端に寄せ、卵を割り入れて白身がやや固まるまで焼く。',
+                    '水と削り節を加え、煮立ったらみそを溶き入れる。'
+                ]
+            },
+            {
+                id:5, title:'なめらか豆腐のそうめん', servings:'1人分', time:'10分', category:'麺・ご飯',
+                ingredients:[
+                    {name:'絹豆腐',amount:'1/2丁(150g)'},{name:'塩',amount:'小さじ1/3'},
+                    {name:'オリーブオイル',amount:'適量'},{name:'そうめん',amount:'1束'}
+                ],
+                steps:[
+                    '豆腐に塩とオリーブオイルを加え、滑らかになるまでよく混ぜる。',
+                    'そうめんを表示通りに茹で、冷水でしめて水気をきる。',
+                    '豆腐ソースとそうめんをよく和えて器に盛る。お好みでオリーブオイルを追加。'
+                ]
+            },
+            {
+                id:6, title:'切り干し大根とトマトジュースのチキンカレー', servings:'2人分', time:'20分', category:'カレー',
+                ingredients:[
+                    {name:'鶏もも肉',amount:'1枚'},{name:'切り干し大根',amount:'20g'},
+                    {name:'トマトジュース',amount:'1缶(190ml)'},{name:'カレー粉',amount:'大さじ1'},
+                    {name:'塩',amount:'小さじ1/2'},{name:'水',amount:'1カップ'}
+                ],
+                steps:[
+                    '切り干し大根を水で戻し、食べやすい長さに切る。鶏肉は一口大に切る。',
+                    'フライパンで鶏肉を焼き色がつくまで焼き、切り干し大根を加えて炒める。',
+                    'トマトジュース・水・カレー粉・塩を加え、15分ほど煮込む。'
+                ]
+            },
+            {
+                id:7, title:'ふわふわ鶏塩麻婆豆腐', servings:'2人分', time:'10分', category:'豆腐料理',
+                ingredients:[
+                    {name:'鶏ひき肉',amount:'150g'},{name:'絹ごし豆腐',amount:'1丁'},
+                    {name:'塩',amount:'小さじ1/3'},{name:'豆板醤',amount:'小さじ1/2'},
+                    {name:'料理酒',amount:'大さじ2'},{name:'水',amount:'1/2カップ'},
+                    {name:'片栗粉',amount:'小さじ2'},{name:'ごま油',amount:'小さじ1'}
+                ],
+                steps:[
+                    'フライパンにごま油を熱し、鶏ひき肉をほぐしながら炒める。',
+                    '豆腐をスプーンで大きくすくい入れ、塩・豆板醤・料理酒・水を加えて煮立てる。',
+                    '水溶き片栗粉を回し入れ、とろみがついたら完成。'
+                ]
+            },
+            {
+                id:8, title:'豚ひき肉と白菜のしょうがシチュー', servings:'2人分', time:'20分', category:'煮込み',
+                ingredients:[
+                    {name:'豚ひき肉',amount:'150g'},{name:'白菜',amount:'1/4個'},
+                    {name:'しょうが',amount:'1かけ'},{name:'バター',amount:'10g'},
+                    {name:'牛乳',amount:'1カップ'},{name:'塩',amount:'小さじ1/2'},
+                    {name:'水',amount:'1カップ'}
+                ],
+                steps:[
+                    'バターでひき肉と千切りのしょうがを炒める。',
+                    'ざく切りの白菜と水を加え、蓋をして弱めの中火で10分煮る。',
+                    '牛乳と塩を加え、温まったら完成。調味料は塩のみのやさしい味。'
+                ]
+            },
+            {
+                id:9, title:'梅ヒジキと豚肉と玉ねぎのドライカレー', servings:'2人分', time:'35分', category:'カレー',
+                ingredients:[
+                    {name:'豚バラ薄切り',amount:'150g'},{name:'乾燥芽ヒジキ',amount:'大さじ2'},
+                    {name:'梅干し',amount:'2個'},{name:'玉ねぎ',amount:'1個'},
+                    {name:'カレー粉',amount:'大さじ1'},{name:'しょうゆ',amount:'小さじ1'},
+                    {name:'ごま油',amount:'小さじ1'}
+                ],
+                steps:[
+                    'ヒジキを水で戻す。玉ねぎはみじん切りにする。',
+                    'ごま油で豚肉と玉ねぎをしっかり炒める。',
+                    'ヒジキ・梅干しをちぎって加え・カレー粉・しょうゆで炒め合わせる。酸味のきいた味わい。'
+                ]
+            },
+            {
+                id:10, title:'もずくと豆腐、ノリのスープ', servings:'2人分', time:'10分', category:'スープ・汁物',
+                ingredients:[
+                    {name:'三杯酢もずく',amount:'1パック'},{name:'絹豆腐',amount:'1/2丁'},
+                    {name:'焼きのり',amount:'1枚'},{name:'水',amount:'1.5カップ'},
+                    {name:'塩',amount:'少々'}
+                ],
+                steps:[
+                    '鍋に水を沸かし、豆腐をスプーンで大きくすくい入れる。',
+                    'もずくを三杯酢の汁ごと加え、ひと煮立ちさせる。',
+                    '焼きのりをちぎり入れ、塩で味を調える。だし汁いらずの簡単スープ。'
+                ]
+            },
+            {
+                id:11, title:'卵ふとんかけごはん', servings:'1人分', time:'5分', category:'麺・ご飯',
+                ingredients:[
+                    {name:'卵',amount:'2個'},{name:'ハム',amount:'2枚'},
+                    {name:'水',amount:'スプーン5杯分'},{name:'しょうゆ',amount:'半回し'},
+                    {name:'塩',amount:'ひとつまみ'},{name:'ごま油',amount:'多め'},
+                    {name:'ごはん',amount:'1膳'},{name:'黒こしょう',amount:'適量'}
+                ],
+                steps:[
+                    '卵を溶き、刻んだハム・水・しょうゆ・塩を加えて混ぜる。',
+                    'ごま油を多めに熱した小さめのフライパンに流し入れ、平べったく焼く。',
+                    'ごはんにのせて黒こしょうを振って完成。目分量でOKの楽ちんレシピ。'
+                ]
+            },
+            {
+                id:12, title:'豚肉、キムチ、トマトの炊き込みご飯', servings:'2人分', time:'10分+炊飯', category:'麺・ご飯',
+                ingredients:[
+                    {name:'米',amount:'2合'},{name:'豚バラ薄切り',amount:'150g'},
+                    {name:'トマト',amount:'1個'},{name:'キムチ',amount:'80g'},
+                    {name:'しょうゆ',amount:'大さじ1'},{name:'塩',amount:'小さじ1/4'}
+                ],
+                steps:[
+                    '豚肉を食べやすい長さに切る。トマトはヘタを取る。キムチは食べやすく刻む。',
+                    '炊飯器の内釜に米・しょうゆ・塩を入れ、2合の目盛りよりやや少なめまで水を注ぎ、豚肉・トマト丸ごと・キムチをのせて炊く。',
+                    '炊き上がったらトマトをくずし、全体をよく混ぜて器に盛る。'
+                ]
+            },
+            {
+                id:13, title:'油揚げと小松菜のカレー', servings:'2人分', time:'15分', category:'カレー',
+                ingredients:[
+                    {name:'小松菜',amount:'1/2袋'},{name:'油揚げ',amount:'2枚'},
+                    {name:'しょうが',amount:'2かけ'},{name:'水',amount:'2カップ'},
+                    {name:'しょうゆ',amount:'大さじ2'},{name:'片栗粉',amount:'大さじ1.5'},
+                    {name:'カレー粉',amount:'小さじ2'},{name:'みりん',amount:'小さじ2'},
+                    {name:'塩',amount:'小さじ1/4'},{name:'ごま油',amount:'小さじ2'},
+                    {name:'たくあん',amount:'適量'}
+                ],
+                steps:[
+                    '小松菜は茎と葉を切り分け3cm幅に切る。油揚げは1.5cm幅の短冊切り。しょうがは千切り。',
+                    'ごま油で小松菜の茎としょうがを炒め、つやが出たら葉と油揚げを加えて炒める。',
+                    '水・しょうゆ・片栗粉・カレー粉・みりん・塩を合わせた調味料を加え、混ぜながら煮立てて2分煮る。たくあんを添えて。'
+                ]
+            },
+            {
+                id:14, title:'しば漬け入り鶏つくね', servings:'2人分', time:'15分', category:'肉料理',
+                ingredients:[
+                    {name:'鶏ももひき肉',amount:'200g'},{name:'しば漬け',amount:'35g'},
+                    {name:'料理酒',amount:'大さじ1'},{name:'片栗粉',amount:'大さじ1'},
+                    {name:'白いりごま',amount:'小さじ2'},{name:'塩',amount:'少々'},
+                    {name:'ごま油',amount:'小さじ1.5'}
+                ],
+                steps:[
+                    'フライパンにひき肉・しば漬け・料理酒・片栗粉・いりごまを入れ、ゴムベラでよく混ぜる。',
+                    '肉だねを12等分に丸め、間隔をあけて並べる。',
+                    'ごま油を回しかけ中火で焼き色つけ、蓋をして弱火で6〜7分蒸し焼き。塩ひとつまみ振って完成。'
+                ]
+            },
+            {
+                id:15, title:'鶏と春菊のわさびバター炊き込みごはん', servings:'2〜3人分', time:'10分+炊飯', category:'麺・ご飯',
+                ingredients:[
+                    {name:'米',amount:'2合'},{name:'鶏もも肉',amount:'大1枚(400g)'},
+                    {name:'春菊',amount:'1束'},{name:'わさび',amount:'小さじ2'},
+                    {name:'みりん',amount:'小さじ1'},{name:'塩',amount:'小さじ1'},
+                    {name:'バター',amount:'10g'},{name:'しょうゆ',amount:'適量'}
+                ],
+                steps:[
+                    '米を洗ってザルに上げ30分おく。炊飯器の内釜に米・わさび・みりん・塩を入れ、2合の目盛りまで水を注ぐ。',
+                    '鶏肉をまるごとのせて炊く。',
+                    '炊き上がったら鶏肉を取り出し、粗みじん切りの春菊・塩ひとつまみ・バターを加えて蓋をし10分蒸らす。鶏肉を切り分けて添え、しょうゆをかけながら食べる。'
+                ]
+            },
+            {
+                id:16, title:'豚ひき肉となすのとろけるハーブ煮込み', servings:'2人分', time:'25分', category:'煮込み',
+                ingredients:[
+                    {name:'豚ひき肉',amount:'150g'},{name:'なす',amount:'中3本'},
+                    {name:'ミニトマト',amount:'4個'},{name:'オリーブオイル',amount:'小さじ1'},
+                    {name:'水',amount:'1カップ'},{name:'料理酒',amount:'1/4カップ'},
+                    {name:'ローズマリー',amount:'2本'},{name:'塩',amount:'小さじ1/4'},
+                    {name:'粉チーズ',amount:'適量'}
+                ],
+                steps:[
+                    'なすはピーラーで皮をむき、1.5cm厚さの半月切りにする。ミニトマトはヘタを取る。',
+                    'オリーブオイルでひき肉をあまり触らず炒め、なす・ミニトマト・水・酒・ローズマリー・塩を加え、弱火で蓋をして15分煮る。',
+                    '蓋を開けミニトマトをつぶしながら軽く煮詰め、粉チーズを振って仕上げる。'
+                ]
+            },
+            {
+                id:17, title:'にんじんの梅しらす蒸し', servings:'2人分', time:'5分', category:'副菜',
+                ingredients:[
+                    {name:'にんじん',amount:'1本'},{name:'梅干し',amount:'1個'},
+                    {name:'しらす',amount:'大さじ2'},{name:'オリーブオイル',amount:'ひとまわし'},
+                    {name:'酒',amount:'大さじ1'},{name:'水',amount:'大さじ1'},
+                    {name:'大葉',amount:'適量'},{name:'塩',amount:'少々'}
+                ],
+                steps:[
+                    'にんじんをスライサーで細切りにする。',
+                    'フライパンににんじん・ちぎった梅干し・しらす・オリーブオイル・酒・水を入れ、蓋をして3分蒸す。',
+                    'ちぎった大葉を加え、水分を飛ばして塩で味を調える。'
+                ]
+            },
+            {
+                id:18, title:'ぽいぽいつくねとしゃきしゃき野菜のまぜごはん', servings:'1人分', time:'15分', category:'麺・ご飯',
+                ingredients:[
+                    {name:'鶏ももひき肉',amount:'100g'},{name:'塩',amount:'1g'},
+                    {name:'料理酒',amount:'小さじ2'},{name:'クミンパウダー',amount:'小さじ1'},
+                    {name:'玉ねぎ',amount:'50g'},{name:'ピーマン',amount:'2個'},
+                    {name:'レモン汁',amount:'適量'},{name:'オリーブオイル',amount:'小さじ2'},
+                    {name:'ごはん',amount:'180g'}
+                ],
+                steps:[
+                    'パックのままひき肉に塩・料理酒・クミンパウダーを加え、しっかり練る。',
+                    'フライパンにオリーブオイルを入れ、スプーンで一口大にすくって並べ、両面焼く。',
+                    'ごはんに薄切りの玉ねぎ・細切りのピーマンをのせ、つくねをオイルごとのせてレモンを絞る。'
+                ]
+            },
+            {
+                id:19, title:'豆乳と大根とホタテ缶、豆腐のスープ', servings:'2人分', time:'15分', category:'スープ・汁物',
+                ingredients:[
+                    {name:'大根',amount:'1/4本'},{name:'絹豆腐',amount:'1/2丁'},
+                    {name:'ホタテ缶',amount:'1缶'},{name:'豆乳',amount:'1カップ'},
+                    {name:'塩',amount:'小さじ1/3'}
+                ],
+                steps:[
+                    '大根を千切りにする。',
+                    '鍋に大根・ホタテ缶を汁ごと・水を入れ、大根が柔らかくなるまで煮る。',
+                    '豆腐をスプーンですくい入れ、豆乳を加えて温め、塩で味を調える。'
+                ]
+            },
+            {
+                id:20, title:'納豆とトマトのピリ辛コチュジャンスープ', servings:'1人分', time:'5分', category:'スープ・汁物',
+                ingredients:[
+                    {name:'納豆',amount:'1パック'},{name:'トマト',amount:'1個'},
+                    {name:'コチュジャン',amount:'小さじ1'},{name:'水',amount:'1.5カップ'},
+                    {name:'ごま油',amount:'少々'},{name:'塩',amount:'少々'}
+                ],
+                steps:[
+                    'トマトを角切りにする。',
+                    '鍋に水・トマト・コチュジャンを入れて煮立てる。',
+                    '納豆を加え、塩で味を調え、ごま油をたらして完成。火を使わなくてもOK。'
+                ]
+            }
+        ];
+
+        let currentCategory = 'すべて';
+        let searchQuery = '';
+
+        function esc(s) {
+            const d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        function catColor(cat) { return CAT_COLORS[cat] || 'var(--secondary)'; }
+
+        function getFiltered() {
+            return RECIPES.filter(r => {
+                const catOk = currentCategory === 'すべて' || r.category === currentCategory;
+                if (!catOk) return false;
+                if (!searchQuery) return true;
+                const q = searchQuery.toLowerCase();
+                if (r.title.toLowerCase().includes(q)) return true;
+                return r.ingredients.some(i => i.name.toLowerCase().includes(q));
+            });
+        }
+
+        function renderCards() {
+            const list = getFiltered();
+            const grid = document.getElementById('grid');
+            const countEl = document.getElementById('recipeCount');
+            countEl.textContent = list.length + '件のレシピ';
+
+            if (!list.length) {
+                grid.innerHTML = '<div class="empty">レシピが見つかりませんでした</div>';
+                return;
+            }
+
+            grid.innerHTML = list.map(r => {
+                const preview = r.ingredients.slice(0, 4).map(i => i.name).join('、');
+                const more = r.ingredients.length > 4 ? ' ほか' : '';
+                return `<div class="card" data-id="${r.id}">
+                    <div class="card-accent" style="background:${catColor(r.category)}"></div>
+                    <div class="card-body">
+                        <span class="card-tag" style="background:${catColor(r.category)}">${esc(r.category)}</span>
+                        <div class="card-title">${esc(r.title)}</div>
+                        <div class="card-meta">
+                            <span>&#9201; ${esc(r.time)}</span>
+                            <span>&#9834; ${esc(r.servings)}</span>
+                        </div>
+                        <div class="card-ingredients">${esc(preview + more)}</div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function openModal(id) {
+            const r = RECIPES.find(x => x.id === id);
+            if (!r) return;
+            const modal = document.getElementById('modal');
+            modal.innerHTML = `
+                <div class="modal-accent" style="background:${catColor(r.category)}"></div>
+                <button class="modal-close" id="modalClose">&times;</button>
+                <div class="modal-body">
+                    <div class="modal-title">${esc(r.title)}</div>
+                    <div class="modal-meta">
+                        <span>&#9201; ${esc(r.time)}</span>
+                        <span>&#9834; ${esc(r.servings)}</span>
+                    </div>
+                    <span class="modal-tag" style="background:${catColor(r.category)}">${esc(r.category)}</span>
+                    <div class="section-label">材料</div>
+                    <div class="ing-list">
+                        ${r.ingredients.map(i => `<div class="ing-row"><span class="ing-name">${esc(i.name)}</span><span class="ing-amount">${esc(i.amount)}</span></div>`).join('')}
+                    </div>
+                    <div class="section-label">作り方</div>
+                    <ol class="steps-list">
+                        ${r.steps.map(s => `<li><span>${esc(s)}</span></li>`).join('')}
+                    </ol>
+                </div>`;
+            document.getElementById('overlay').classList.add('show');
+            document.body.style.overflow = 'hidden';
+            document.getElementById('modalClose').addEventListener('click', closeModal);
+        }
+
+        function closeModal() {
+            document.getElementById('overlay').classList.remove('show');
+            document.body.style.overflow = '';
+        }
+
+        function renderCatBtns() {
+            const wrap = document.getElementById('categoryBtns');
+            wrap.innerHTML = CATEGORIES.map(c =>
+                `<button class="cat-btn${c === currentCategory ? ' active' : ''}" data-cat="${esc(c)}">${esc(c)}</button>`
+            ).join('');
+        }
+
+        function init() {
+            renderCatBtns();
+            renderCards();
+
+            document.getElementById('categoryBtns').addEventListener('click', function(e) {
+                const btn = e.target.closest('.cat-btn');
+                if (!btn) return;
+                currentCategory = btn.dataset.cat;
+                renderCatBtns();
+                renderCards();
+            });
+
+            document.getElementById('search').addEventListener('input', function(e) {
+                searchQuery = e.target.value.trim();
+                renderCards();
+            });
+
+            document.getElementById('grid').addEventListener('click', function(e) {
+                const card = e.target.closest('.card');
+                if (!card) return;
+                openModal(Number(card.dataset.id));
+            });
+
+            document.getElementById('overlay').addEventListener('click', function(e) {
+                if (e.target === this) closeModal();
+            });
+
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') closeModal();
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    })();
+    </script>
+</body>
+</html>
